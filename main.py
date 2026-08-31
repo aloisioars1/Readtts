@@ -5,18 +5,8 @@ from kivy.uix.button import Button
 from kivy.uix.label import Label
 from kivy.uix.spinner import Spinner
 from kivy.core.audio import SoundLoader
-from kivy.utils import platform
 import os
 from gtts import gTTS
-
-# caminho Download - funciona no Android e no PC
-if platform == 'android':
-    from android.storage import primary_external_storage_path
-    DOWNLOAD_DIR = primary_external_storage_path()
-else:
-    DOWNLOAD_DIR = os.path.expanduser("~/Downloads")
-
-DOWNLOAD_FILE = os.path.join(DOWNLOAD_DIR, "aloisio_tts.mp3")
 
 class AloisioTTSApp(App):
     def build(self):
@@ -28,7 +18,6 @@ class AloisioTTSApp(App):
         self.caixa = TextInput(hint_text="Cole seu texto grego aqui...", font_size=16, multiline=True)
         root.add_widget(self.caixa)
 
-        # Spinner de idiomas (bem mais leve que 6 RadioButtons)
         self.lang_spinner = Spinner(
             text='Greek - el',
             values=('Portuguese - pt', 'English - en', 'Italian - it', 'Spanish - es', 'French - fr', 'Greek - el'),
@@ -37,7 +26,7 @@ class AloisioTTSApp(App):
         )
         root.add_widget(self.lang_spinner)
 
-        self.status = Label(text="Pronto", size_hint_y=None, height=30)
+        self.status = Label(text="Pronto - vai salvar em Downloads", size_hint_y=None, height=40)
         root.add_widget(self.status)
 
         btn_layout = BoxLayout(size_hint_y=None, height=50, spacing=10)
@@ -53,8 +42,16 @@ class AloisioTTSApp(App):
         return root
 
     def get_lang_code(self):
-        # "Greek - el" -> "el"
         return self.lang_spinner.text.split("-")[-1].strip()
+
+    def get_download_path(self):
+        # Caminho seguro que funciona em todo Android sem permissão especial
+        try:
+            from android.storage import primary_external_storage_path
+            d = primary_external_storage_path()
+            return os.path.join(d, "Download", "aloisio_tts.mp3")
+        except:
+            return "/sdcard/Download/aloisio_tts.mp3"
 
     def salvar_audio(self, instance):
         texto = self.caixa.text.strip()
@@ -65,15 +62,18 @@ class AloisioTTSApp(App):
             self.status.text = "Gerando..."
             idioma = self.get_lang_code()
             tts = gTTS(texto, lang=idioma)
-            tts.save(DOWNLOAD_FILE)
-            self.status.text = f"Salvo em: {DOWNLOAD_FILE}"
+            path = self.get_download_path()
+            os.makedirs(os.path.dirname(path), exist_ok=True)
+            tts.save(path)
+            self.status.text = f"Salvo: {path}"
         except Exception as e:
             self.status.text = f"Erro: {e}"
 
     def ler_audio(self, instance):
-        if os.path.exists(DOWNLOAD_FILE):
+        path = self.get_download_path()
+        if os.path.exists(path):
             try:
-                sound = SoundLoader.load(DOWNLOAD_FILE)
+                sound = SoundLoader.load(path)
                 if sound:
                     sound.play()
                     self.status.text = "Tocando..."
